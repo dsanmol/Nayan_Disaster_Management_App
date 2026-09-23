@@ -1,0 +1,7 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+backend/nayan.db
+backend/uploads/
+.pytest_cache/

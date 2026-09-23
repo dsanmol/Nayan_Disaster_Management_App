@@ -1,0 +1,29 @@
+services:
+  nayan:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://nayan:nayan@database:5432/nayan
+      NAYAN_JWT_SECRET: ${NAYAN_JWT_SECRET:?Set NAYAN_JWT_SECRET in your environment}
+      NAYAN_ROUTING_URL: ${NAYAN_ROUTING_URL:-}
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+  database:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: nayan
+      POSTGRES_USER: nayan
+      POSTGRES_PASSWORD: nayan
+    volumes:
+      - nayan-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nayan -d nayan"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+volumes:
+  nayan-data:
