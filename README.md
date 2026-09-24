@@ -15,7 +15,9 @@ backend/.venv/Scripts/python.exe -m uvicorn backend.app.main:app --host 127.0.0.
 
 Open http://127.0.0.1:8000. The first run creates and seeds the database at `backend/nayan.db`. API documentation is at http://127.0.0.1:8000/docs. On macOS/Linux use `backend/.venv/bin/python` for the venv executable.
 
-## Demo accounts
+## Local demo accounts
+
+These shared accounts are seeded only when `NAYAN_DEMO_MODE=true` (the default for local development). They are disabled in the Render deployment.
 
 - Admin: `admin@nayan.demo` / `AdminDemo123`
 - Responder: `responder@nayan.demo` / `Responder123`
@@ -45,7 +47,7 @@ The compose stack starts the web app and a PostGIS database with a persistent Do
 
 ## Render demo deployment
 
-`render.yaml` defines a free web service and free managed PostgreSQL database. Push this `outputs` directory to a Git provider repository and create a Render Blueprint from it. Render generates a private JWT secret and initial admin password; sign in as `admin@nayan.demo` and read the generated password from the service environment settings. Shared demo passwords are disabled on Render. Free Render Postgres expires after 30 days, so this blueprint is for a temporary demo only; select a durable paid database for ongoing use. Render free web services can sleep and do not include persistent local disk storage, so uploaded photos are temporary. Configure object storage before relying on image retention.
+`render.yaml` defines a free web service and free managed PostgreSQL database. Push this `outputs` directory to a Git provider repository and create a Render Blueprint from it. Render generates a private JWT secret and initial admin password; sign in as `admin@nayan.demo` and read the generated password from the service environment settings. The shared demo passwords listed above are disabled on Render. Free Render Postgres expires after 30 days, so this blueprint is for a temporary demo only; select a durable paid database for ongoing use. Render free web services can sleep and do not include persistent local disk storage, so uploaded photos are temporary. Configure object storage before relying on image retention.
 
 ## Production work still required
 
