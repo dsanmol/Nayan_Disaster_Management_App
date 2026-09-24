@@ -25,7 +25,7 @@ Browser (HTML / CSS / JavaScript)
 FastAPI service
   |-- auth and role checks
   |-- incident, resource, mission, shelter and alert APIs
-  |-- severity, duplicate matching, priority, recommendations
+  |-- local text classification and similarity, severity, priority, recommendations
   |-- simulator, analytics, image upload, route adapter
 PostgreSQL + PostGIS (deploy) / SQLite (local)
   |-- incidents, users, resources, missions, shelters, alerts, history
@@ -56,7 +56,7 @@ Incidents are ordered by descending score and then newest report. Production pri
 
 ### Duplicate suggestions
 
-Open reports within one kilometer are compared using incident type and normalized description similarity. Matches are suggestions for a human to review; reports are not automatically merged.
+Open reports within one kilometer are compared using TF-IDF cosine similarity over the incident type and description. Classification uses a local TF-IDF + Logistic Regression pipeline trained on the small curated prototype corpus in `backend/app/ml.py`. Both outputs are advisory: the corpus is not validated for live response, confidence is not calibrated, and an operator must review classifications and possible duplicates.
 
 ### Resource recommendation
 

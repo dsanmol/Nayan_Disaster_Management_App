@@ -28,10 +28,10 @@ New public registrations receive the Citizen role. Administrators can create sta
 - Citizen registration/login, incident intake, map-picked coordinates, optional photo uploads, incident status view, public alerts, and shelters.
 - Responder sign-in, mission tracking, field status progression, and route previews.
 - Admin command dashboard, incident priority queue, resource/shelter/alert management, assignments, analytics, and recurring 10-second incident simulation.
-- Transparent severity scoring, nearby duplicate suggestions, resource recommendations, WebSocket update events, CSV incident export, and an OpenStreetMap view.
+- Local TF-IDF + Logistic Regression incident classification, TF-IDF cosine similarity for nearby duplicate suggestions, transparent severity scoring, resource recommendations, WebSocket updates, CSV export, and an OpenStreetMap view.
 - SQLite for local setup. PostgreSQL deployments automatically enable PostGIS and maintain indexed point geometry for incidents, resources, and shelters.
 
-Severity and duplicate results are decision-support suggestions and require human review. Without a configured `NAYAN_ROUTING_URL`, routes are straight-line estimates. To use a private OSRM service, set that URL on the API server. Browser map tiles are provided by OpenStreetMap; review their usage policy before high-volume or operational use.
+Incident classification, severity, duplicate and resource results are decision-support suggestions and require human review. The classifier is trained on a small set of curated prototype examples included in `backend/app/ml.py`; it has not been validated for emergency operations and must not be used as a substitute for dispatcher judgment. Model confidence is not a calibrated probability. Without a configured `NAYAN_ROUTING_URL`, routes are straight-line estimates. To use a private OSRM service, set that URL on the API server. Browser map tiles are provided by OpenStreetMap; review their usage policy before high-volume or operational use.
 
 ## Docker with PostGIS
 

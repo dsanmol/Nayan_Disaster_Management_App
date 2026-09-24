@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import math
 import re
-from difflib import SequenceMatcher
 from typing import Iterable
+from .ml import text_similarity
 
 
 def haversine_km(a_lat: float, a_lon: float, b_lat: float, b_lon: float) -> float:
@@ -25,7 +25,7 @@ def duplicate_candidates(report, incidents: Iterable, radius_km: float = 1.0):
         if incident.status in {"Resolved", "Cancelled"}:
             continue
         distance = haversine_km(report.latitude, report.longitude, incident.latitude, incident.longitude)
-        similarity = SequenceMatcher(None, report_text, words(f"{incident.type} {incident.description}")).ratio()
+        similarity = text_similarity(report_text, words(f"{incident.type} {incident.description}"))
         same_type = words(report.type) == words(incident.type)
         if distance <= radius_km and (similarity >= 0.28 or same_type):
             candidates.append({"incident_id": incident.id, "type": incident.type, "place": incident.place, "distance_km": round(distance, 2), "text_similarity": round(similarity, 2), "severity": incident.severity_level})

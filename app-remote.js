@@ -256,7 +256,7 @@
                 const suggestion = await api('/api/intelligence/classify', { method: 'POST', body: JSON.stringify({ text: description.value }) });
                 note.replaceChildren();
                 if (suggestion.matched_signals) {
-                  note.append(document.createTextNode(`Suggested category: ${suggestion.suggested_type} (${Math.round(suggestion.confidence * 100)}% keyword match). `));
+                  note.append(document.createTextNode(`AI suggested category: ${suggestion.suggested_type} (${Math.round(suggestion.confidence * 100)}% model confidence). `));
                   const choose = document.createElement('button'); choose.type = 'button'; choose.className = 'btn'; choose.textContent = 'Use suggestion';
                   choose.onclick = () => { if ([...kind.options].some((option) => option.text === suggestion.suggested_type)) kind.value = suggestion.suggested_type; };
                   note.append(choose);

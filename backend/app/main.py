@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from .algorithms import duplicate_candidates, haversine_km, recommend_resources
+from .ml import classify_incident as predict_incident_type
 
 APP_DIR = Path(__file__).resolve().parent
 OUTPUTS = APP_DIR.parents[1]
@@ -644,18 +645,7 @@ def check_duplicates(payload: IncidentIn, user: User = Depends(user_dep)):
 
 @app.post("/api/intelligence/classify")
 def classify_incident(payload: ClassifyIn, user: User = Depends(user_dep)):
-    text_value = payload.text.lower()
-    categories = {
-        "Urban flooding": ("flood", "waterlogging", "water logging", "overflow", "inundat", "submerged"),
-        "Building fire": ("fire", "smoke", "burning", "flame", "blaze"),
-        "Road accident": ("accident", "collision", "crash", "vehicle", "road traffic"),
-        "Medical emergency": ("injury", "injured", "medical", "unconscious", "ambulance", "bleeding"),
-        "Infrastructure damage": ("bridge", "road damage", "power line", "building collapse", "structural", "landslide"),
-    }
-    matches = {label: sum(text_value.count(term) for term in terms) for label, terms in categories.items()}
-    best = max(matches, key=matches.get)
-    count = matches[best]
-    return {"suggested_type": best if count else "Other emergency", "confidence": min(0.94, round(0.38 + count * 0.17, 2)) if count else 0.25, "matched_signals": matches[best] if count else 0, "model": "transparent keyword baseline", "requires_human_review": True}
+    return predict_incident_type(payload.text)
 
 
 @app.get("/api/incidents/{incident_id}/recommendations")
