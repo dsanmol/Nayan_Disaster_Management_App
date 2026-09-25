@@ -1,6 +1,6 @@
 # Nayan Disaster Management System
 
-Nayan is a browser-based disaster response coordination application for the Indore district demo scenario. A FastAPI service serves the UI and JSON API; SQLite is the default local database and PostgreSQL with PostGIS is supported for deployment.
+Nayan is a browser-based disaster response coordination application for the Bhopal district demo scenario. A FastAPI service serves the UI and JSON API; SQLite is the default local database and PostgreSQL with PostGIS is supported for deployment.
 
 ## Run locally on Windows
 

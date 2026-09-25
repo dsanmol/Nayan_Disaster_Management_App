@@ -22,6 +22,8 @@ from .ml import classify_incident as predict_incident_type
 
 APP_DIR = Path(__file__).resolve().parent
 OUTPUTS = APP_DIR.parents[1]
+BHOPAL_LAT = 23.2599
+BHOPAL_LON = 77.4126
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{(APP_DIR.parent / 'nayan.db').as_posix()}")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len("postgres://"):]
@@ -53,8 +55,8 @@ class Incident(Base):
     type: Mapped[str] = mapped_column(String(100), index=True)
     description: Mapped[str] = mapped_column(Text)
     place: Mapped[str] = mapped_column(String(240))
-    latitude: Mapped[float] = mapped_column(Float, default=22.7196)
-    longitude: Mapped[float] = mapped_column(Float, default=75.8577)
+    latitude: Mapped[float] = mapped_column(Float, default=BHOPAL_LAT)
+    longitude: Mapped[float] = mapped_column(Float, default=BHOPAL_LON)
     people_affected: Mapped[int] = mapped_column(Integer, default=0)
     medical_required: Mapped[bool] = mapped_column(Boolean, default=False)
     severity_score: Mapped[int] = mapped_column(Integer, default=20)
@@ -71,9 +73,9 @@ class Resource(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120), unique=True)
     type: Mapped[str] = mapped_column(String(60))
-    base: Mapped[str] = mapped_column(String(160), default="Indore district")
-    latitude: Mapped[float] = mapped_column(Float, default=22.7196)
-    longitude: Mapped[float] = mapped_column(Float, default=75.8577)
+    base: Mapped[str] = mapped_column(String(160), default="Bhopal district")
+    latitude: Mapped[float] = mapped_column(Float, default=BHOPAL_LAT)
+    longitude: Mapped[float] = mapped_column(Float, default=BHOPAL_LON)
     status: Mapped[str] = mapped_column(String(30), default="Available", index=True)
     capacity: Mapped[str] = mapped_column(String(120), default="")
     skills: Mapped[str] = mapped_column(Text, default="")
@@ -95,8 +97,8 @@ class Shelter(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(160), unique=True)
     place: Mapped[str] = mapped_column(String(160))
-    latitude: Mapped[float] = mapped_column(Float, default=22.7196)
-    longitude: Mapped[float] = mapped_column(Float, default=75.8577)
+    latitude: Mapped[float] = mapped_column(Float, default=BHOPAL_LAT)
+    longitude: Mapped[float] = mapped_column(Float, default=BHOPAL_LON)
     capacity: Mapped[int] = mapped_column(Integer)
     occupied: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(30), default="Open")
@@ -217,8 +219,8 @@ class IncidentIn(BaseModel):
     type: str = Field(min_length=2, max_length=100)
     description: str = Field(min_length=5, max_length=4000)
     place: str = Field(min_length=2, max_length=240)
-    latitude: float = Field(ge=-90, le=90, default=22.7196)
-    longitude: float = Field(ge=-180, le=180, default=75.8577)
+    latitude: float = Field(ge=-90, le=90, default=BHOPAL_LAT)
+    longitude: float = Field(ge=-180, le=180, default=BHOPAL_LON)
     people_affected: int = Field(ge=0, le=100000, default=0)
     medical_required: bool = False
 
@@ -231,9 +233,9 @@ class StatusIn(BaseModel):
 class ResourceIn(BaseModel):
     name: str
     type: str
-    base: str = "Indore district"
-    latitude: float = 22.7196
-    longitude: float = 75.8577
+    base: str = "Bhopal district"
+    latitude: float = BHOPAL_LAT
+    longitude: float = BHOPAL_LON
     capacity: str = ""
     skills: str = ""
     status: str = "Available"
@@ -242,8 +244,8 @@ class ResourceIn(BaseModel):
 class ShelterIn(BaseModel):
     name: str
     place: str
-    latitude: float = 22.7196
-    longitude: float = 75.8577
+    latitude: float = BHOPAL_LAT
+    longitude: float = BHOPAL_LON
     capacity: int = Field(gt=0)
     occupied: int = Field(ge=0, default=0)
     status: str = "Open"
@@ -302,6 +304,45 @@ def init_db():
                 connection.execute(text(f"CREATE INDEX IF NOT EXISTS idx_{table}_geom ON {table} USING GIST (geom)"))
     with Session.begin() as db:
         if db.scalar(select(Incident.id).limit(1)):
+            # Move the original built-in Indore demo records to Bhopal without
+            # changing incident records submitted by users.
+            demo_incidents = {
+                "NAY-0261": ("Arera Colony · 10 No. Market", 23.2118, 77.4347),
+                "NAY-0260": ("MP Nagar · Zone 1", 23.2346, 77.4302),
+                "NAY-0259": ("TT Nagar · New Market", 23.2341, 77.4010),
+                "NAY-0258": ("Bairagarh · Main Road", 23.2865, 77.3373),
+            }
+            for incident_id, (place, latitude, longitude) in demo_incidents.items():
+                incident = db.get(Incident, incident_id)
+                if incident:
+                    incident.place, incident.latitude, incident.longitude = place, latitude, longitude
+            demo_bases = {
+                "Central Fire Station": ("Bhopal Fire Station · Jahangirabad", 23.2599, 77.4126),
+                "MG Road Fire Station": ("MP Nagar Fire Station", 23.2346, 77.4302),
+                "Vijay Nagar HQ": ("Arera Colony Response Base", 23.2118, 77.4347),
+                "MY Hospital": ("Hamidia Hospital", 23.2599, 77.4126),
+                "Rau staging area": ("Bairagarh Staging Area", 23.2865, 77.3373),
+                "Palasia Station": ("TT Nagar Fire Station", 23.2341, 77.4010),
+            }
+            for resource in db.scalars(select(Resource)).all():
+                if resource.base in demo_bases:
+                    resource.base, resource.latitude, resource.longitude = demo_bases[resource.base]
+            demo_shelters = {
+                "Devi Ahilya Relief Center": ("Arera Colony Relief Center", "Arera Colony", 23.2118, 77.4347),
+                "Nehru Stadium Community Hall": ("TT Nagar Community Hall", "TT Nagar", 23.2341, 77.4010),
+                "Rau Government School": ("Bairagarh Government School", "Bairagarh", 23.2865, 77.3373),
+                "Scheme 78 Community Center": ("MP Nagar Community Center", "MP Nagar", 23.2346, 77.4302),
+            }
+            for shelter in db.scalars(select(Shelter)).all():
+                if shelter.name in demo_shelters:
+                    shelter.name, shelter.place, shelter.latitude, shelter.longitude = demo_shelters[shelter.name]
+            for alert in db.scalars(select(Alert)).all():
+                if alert.title.startswith("Flood advisory · Khan River"):
+                    alert.title, alert.area = "Flood advisory · Upper Lake low-lying areas", "Upper Lake corridor"
+                    alert.message = "Residents near the Upper Lake shoreline should move to higher ground and follow marked evacuation routes. Relief centers are open."
+                elif alert.title.startswith("Traffic diversion · AB Road"):
+                    alert.title, alert.area = "Traffic diversion · MP Nagar", "MP Nagar"
+                    alert.message = "Emergency vehicles have priority in MP Nagar. Use the outer BRTS corridor as an alternate route where possible."
             return
         if os.getenv("NAYAN_DEMO_MODE", "true").lower() == "true":
             accounts = [("Asha Citizen", "citizen@nayan.demo", "CitizenDemo123", "CITIZEN"), ("Ravi Responder", "responder@nayan.demo", "Responder123", "RESPONDER"), ("Arjun Sharma", "admin@nayan.demo", "AdminDemo123", "ADMIN")]
@@ -318,19 +359,19 @@ def init_db():
         citizen = next((u for u in users if u.role == "CITIZEN"), None)
         admin = next((u for u in users if u.role == "ADMIN"), None)
         items = [
-            ("NAY-0261", "Urban flooding", "Water entering ground-floor homes near the main junction.", "Vijay Nagar · Scheme 54", 22.7532, 75.8937, 28, True, 94, "Critical", "En route", "Rescue Team Alpha"),
-            ("NAY-0260", "Building fire", "Smoke reported from a commercial building; occupants evacuating.", "Rajwada · Maharaja Tukoji Road", 22.7196, 75.8577, 16, True, 86, "Critical", "Assigned", "Fire Unit 03"),
-            ("NAY-0259", "Road accident", "Multi-vehicle collision blocking the northbound lane.", "AB Road · LIG Square", 22.7337, 75.8932, 7, True, 72, "High", "En route", "Ambulance 12"),
-            ("NAY-0258", "Water supply disruption", "Water main break affecting nearby residential blocks.", "Rau · CAT Road", 22.6407, 75.8081, 140, False, 48, "Medium", "Reported", "Unassigned"),
+            ("NAY-0261", "Urban flooding", "Water entering ground-floor homes near the main junction.", "Arera Colony · 10 No. Market", 23.2118, 77.4347, 28, True, 94, "Critical", "En route", "Rescue Team Alpha"),
+            ("NAY-0260", "Building fire", "Smoke reported from a commercial building; occupants evacuating.", "MP Nagar · Zone 1", 23.2346, 77.4302, 16, True, 86, "Critical", "Assigned", "Fire Unit 03"),
+            ("NAY-0259", "Road accident", "Multi-vehicle collision blocking the northbound lane.", "TT Nagar · New Market", 23.2341, 77.4010, 7, True, 72, "High", "En route", "Ambulance 12"),
+            ("NAY-0258", "Water supply disruption", "Water main break affecting nearby residential blocks.", "Bairagarh · Main Road", 23.2865, 77.3373, 140, False, 48, "Medium", "Reported", "Unassigned"),
         ]
         db.add_all([Incident(id=x[0], type=x[1], description=x[2], place=x[3], latitude=x[4], longitude=x[5], people_affected=x[6], medical_required=x[7], severity_score=x[8], severity_level=x[9], status=x[10], unit=x[11], reporter_id=citizen.id if citizen else None) for x in items])
-        resources = [Resource(name="Ambulance 12", type="Ambulance", base="Central Fire Station", status="En route", capacity="2 patients", skills="Advanced life support"), Resource(name="Fire Unit 03", type="Fire team", base="MG Road Fire Station", status="Assigned", capacity="6 crew", skills="Urban fire response"), Resource(name="Rescue Team Alpha", type="Rescue team", base="Vijay Nagar HQ", status="En route", capacity="8 crew", skills="Water rescue · extraction"), Resource(name="Ambulance 08", type="Ambulance", base="MY Hospital", status="Available", capacity="2 patients", skills="Emergency medical"), Resource(name="Rescue Team Bravo", type="Rescue team", base="Rau staging area", status="Available", capacity="10 crew", skills="Search and rescue"), Resource(name="Fire Unit 01", type="Fire team", base="Palasia Station", status="Available", capacity="5 crew", skills="Fire suppression")]
+        resources = [Resource(name="Ambulance 12", type="Ambulance", base="Bhopal Fire Station · Jahangirabad", status="En route", capacity="2 patients", skills="Advanced life support", latitude=23.2599, longitude=77.4126), Resource(name="Fire Unit 03", type="Fire team", base="MP Nagar Fire Station", status="Assigned", capacity="6 crew", skills="Urban fire response", latitude=23.2346, longitude=77.4302), Resource(name="Rescue Team Alpha", type="Rescue team", base="Arera Colony Response Base", status="En route", capacity="8 crew", skills="Water rescue · extraction", latitude=23.2118, longitude=77.4347), Resource(name="Ambulance 08", type="Ambulance", base="Hamidia Hospital", status="Available", capacity="2 patients", skills="Emergency medical", latitude=23.2599, longitude=77.4126), Resource(name="Rescue Team Bravo", type="Rescue team", base="Bairagarh Staging Area", status="Available", capacity="10 crew", skills="Search and rescue", latitude=23.2865, longitude=77.3373), Resource(name="Fire Unit 01", type="Fire team", base="TT Nagar Fire Station", status="Available", capacity="5 crew", skills="Fire suppression", latitude=23.2341, longitude=77.4010)]
         db.add_all(resources)
         db.flush()
-        db.add_all([Shelter(name="Devi Ahilya Relief Center", place="Vijay Nagar", capacity=240, occupied=168), Shelter(name="Nehru Stadium Community Hall", place="South Tukoganj", capacity=350, occupied=291), Shelter(name="Rau Government School", place="Rau", capacity=160, occupied=92), Shelter(name="Scheme 78 Community Center", place="Vijay Nagar", capacity=180, occupied=104)])
+        db.add_all([Shelter(name="Arera Colony Relief Center", place="Arera Colony", latitude=23.2118, longitude=77.4347, capacity=240, occupied=168), Shelter(name="TT Nagar Community Hall", place="TT Nagar", latitude=23.2341, longitude=77.4010, capacity=350, occupied=291), Shelter(name="Bairagarh Government School", place="Bairagarh", latitude=23.2865, longitude=77.3373, capacity=160, occupied=92), Shelter(name="MP Nagar Community Center", place="MP Nagar", latitude=23.2346, longitude=77.4302, capacity=180, occupied=104)])
         if admin:
             db.add_all([Mission(id="MSN-091", incident_id="NAY-0261", resource_id=resources[2].id, assigned_by=admin.id, status="En route"), Mission(id="MSN-090", incident_id="NAY-0260", resource_id=resources[1].id, assigned_by=admin.id, status="Assigned"), Mission(id="MSN-089", incident_id="NAY-0259", resource_id=resources[0].id, assigned_by=admin.id, status="En route")])
-        db.add_all([Alert(title="Flood advisory · Khan River low-lying areas", message="Residents near the river corridor should move to higher ground and follow marked evacuation routes. Relief centers are open.", severity="Critical", area="Khan River corridor"), Alert(title="Traffic diversion · AB Road northbound", message="Emergency vehicles have priority at LIG Square. Use Ring Road as an alternate route where possible.", severity="High", area="AB Road")])
+        db.add_all([Alert(title="Flood advisory · Upper Lake low-lying areas", message="Residents near the Upper Lake shoreline should move to higher ground and follow marked evacuation routes. Relief centers are open.", severity="Critical", area="Upper Lake corridor"), Alert(title="Traffic diversion · MP Nagar", message="Emergency vehicles have priority in MP Nagar. Use the outer BRTS corridor as an alternate route where possible.", severity="High", area="MP Nagar")])
 
 
 @app.on_event("startup")
@@ -521,10 +562,17 @@ def update_shelter(shelter_id: int, payload: dict[str, Any], user: User = Depend
 
 
 @app.get("/api/missions")
-def list_missions(user: User = Depends(allow("ADMIN", "RESPONDER"))):
+def list_missions(user: User = Depends(allow("ADMIN", "RESPONDER", "CITIZEN"))):
     with Session() as db:
         rows = db.scalars(select(Mission).order_by(Mission.assigned_at.desc())).all()
-        return [{"id": m.id, "incident_id": m.incident_id, "resource_id": m.resource_id, "unit": db.get(Resource, m.resource_id).name, "status": m.status, "assigned_at": m.assigned_at.isoformat()} for m in rows]
+        result = []
+        for mission in rows:
+            incident = db.get(Incident, mission.incident_id)
+            if user.role == "CITIZEN" and (mission.status == "Completed" or not incident or incident.status in {"Resolved", "Cancelled"}):
+                continue
+            resource = db.get(Resource, mission.resource_id)
+            result.append({"id": mission.id, "incident_id": mission.incident_id, "incident_type": incident.type if incident else "Incident", "place": incident.place if incident else "", "resource_id": mission.resource_id, "unit": resource.name if resource else "Response team", "status": mission.status, "assigned_at": mission.assigned_at.isoformat()})
+        return result
 
 
 @app.post("/api/missions", status_code=201)
@@ -614,7 +662,7 @@ async def upload_incident_image(incident_id: str, image: UploadFile = File(...),
 
 @app.post("/api/simulation/run")
 async def simulate(user: User = Depends(allow("ADMIN"))):
-    cases = [("Flash flooding", "Palasia · YN Road", "Rapid water rise reported near homes; urgent support requested.", 22, True, 22.726, 75.884), ("Road accident", "Ring Road · Rau junction", "Two-vehicle collision; first aid requested.", 4, True, 22.643, 75.812), ("Power outage", "Scheme 78 · Sector B", "Power lines down after strong winds.", 0, False, 22.754, 75.900)]
+    cases = [("Flash flooding", "Arera Colony · Link Road", "Rapid water rise reported near homes; urgent support requested.", 22, True, 23.2118, 77.4347), ("Road accident", "TT Nagar · New Market", "Multi-vehicle collision; first aid requested.", 4, True, 23.2341, 77.4010), ("Power outage", "MP Nagar · Zone 2", "Power lines down after strong winds.", 0, False, 23.2346, 77.4302)]
     case = secrets.choice(cases)
     score, severity = score_incident(case[3], case[4], case[0], case[2])
     with Session.begin() as db:

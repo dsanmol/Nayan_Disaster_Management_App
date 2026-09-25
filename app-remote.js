@@ -1,5 +1,6 @@
 // Nayan web client: authentication, API hydration, role-aware controls, and persistent mutations.
 (() => {
+  const BHOPAL = { lat: 23.2599, lon: 77.4126 };
   const apiRoot = location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
   let token = localStorage.getItem('nayan-token');
   let profile = null;
@@ -54,28 +55,39 @@
     const [incidents, resources, shelters, alerts] = await Promise.all([
       api('/api/incidents'), api('/api/resources'), api('/api/shelters'), api('/api/alerts')
     ]);
-    let missions = [];
+    const missions = await api('/api/missions');
     let analytics = null;
     if (profile.role !== 'CITIZEN') {
-      [missions, analytics] = await Promise.all([api('/api/missions'), api('/api/analytics')]);
+      analytics = await api('/api/analytics');
       db._analytics = analytics;
     }
     db.incidents = incidents.map(mapIncident);
     db.resources = resources.map((r) => ({ ...r, skill: r.skills, icon: r.type === 'Ambulance' ? '✚' : r.type === 'Fire team' ? '♨' : '⚑' }));
     db.shelters = shelters;
     db.alerts = alerts.map((a) => ({ title: `${a.title}${a.area && a.area !== 'District-wide' ? ` · ${a.area}` : ''}`, text: a.message, level: a.severity, time: new Date(a.created_at).toLocaleString() }));
-    db.missions = missions.map((m) => ({ id: m.id, incident_id: m.incident_id, incident: `${m.incident_id} · ${db.incidents.find((i) => i.id === m.incident_id)?.type || 'Incident'}`, unit: m.unit, assigned: new Date(m.assigned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), status: m.status }));
+    db.missions = missions.map((m) => {
+      const incident = db.incidents.find((item) => item.id === m.incident_id);
+      const place = m.place || incident?.place || '';
+      return { id: m.id, incident_id: m.incident_id, incident: `${m.incident_id} · ${m.incident_type || incident?.type || 'Incident'}${place ? ` · ${place}` : ''}`, place, unit: m.unit, assigned: new Date(m.assigned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), status: m.status };
+    });
     localStorage.setItem('nayan-state', JSON.stringify(db));
     prior = copy(db);
     render();
     if (leafletMap) drawMarkers();
   }
   function configureRole() {
+    document.body.classList.toggle('citizen-mode', profile.role === 'CITIZEN');
+    if (!document.getElementById('roleViewStyles')) {
+      const style = document.createElement('style');
+      style.id = 'roleViewStyles';
+      style.textContent = '.citizen-mode #incidentsTable .table-action,.citizen-mode #missionsTable .btn{display:none!important}.citizen-mode #view-missions .panel-title .live,.citizen-mode #view-missions th:last-child,.citizen-mode #missionsTable td:last-child{display:none!important}';
+      document.head.append(style);
+    }
     document.querySelector('.profile b').textContent = profile.name;
     document.querySelector('.profile span').textContent = profile.role[0] + profile.role.slice(1).toLowerCase();
     document.querySelectorAll('.nav-item').forEach((item) => {
       const v = item.dataset.view;
-      item.classList.toggle('hidden', profile.role === 'CITIZEN' && ['missions', 'resources', 'analytics'].includes(v));
+      item.classList.toggle('hidden', profile.role === 'CITIZEN' && ['resources', 'analytics'].includes(v));
       item.classList.toggle('hidden', profile.role === 'RESPONDER' && ['resources'].includes(v));
     });
     if (profile.role !== 'ADMIN') {
@@ -84,6 +96,14 @@
     if (profile.role === 'CITIZEN') {
       document.querySelectorAll('#incidentsTable .table-action').forEach((el) => el.classList.add('hidden'));
       document.querySelectorAll('[data-view="alerts"],[data-view="shelters"]').forEach((el) => el.classList.remove('hidden'));
+    }
+    if (!window.nayanCitizenActionGuard) {
+      const originalCycleIncident = window.cycleIncident;
+      window.cycleIncident = (id) => {
+        if (profile?.role === 'CITIZEN') return toast('Citizens can report incidents and track response status.');
+        return originalCycleIncident?.(id);
+      };
+      window.nayanCitizenActionGuard = true;
     }
     if (!document.getElementById('logoutBtn')) {
       const b = document.createElement('button'); b.id = 'logoutBtn'; b.className = 'iconbtn'; b.textContent = 'Sign out';
@@ -119,10 +139,10 @@
     finally { $('authSubmit').disabled = false; }
   };
   async function enterApp() {
+    window.nayanRemote = { persist, role: profile.role };
     configureRole(); await hydrate(); $('authScreen').classList.add('hidden');
-    window.nayanRemote = { persist };
     installMap(); addRouteActions(); addPhotoControl(); startSimulationLoop(); useRecommendedDispatch();
-    if (profile.role !== 'CITIZEN') startSocket();
+    startSocket();
   }
   async function persistChanges() {
     if (!profile || !prior) return;
@@ -131,9 +151,9 @@
     for (const i of db.incidents) {
       const old = before.incidents.find((x) => x.id === i.id);
       if (!old) {
-        const duplicates = await api('/api/incidents/check-duplicates', { method: 'POST', body: JSON.stringify({ type: i.type, description: i.desc, place: i.place, latitude: i.latitude || 22.7196, longitude: i.longitude || 75.8577, people_affected: Number(i.people) || 0, medical_required: !!i.medical }) }).catch(() => ({ possible_duplicates: [] }));
+        const duplicates = await api('/api/incidents/check-duplicates', { method: 'POST', body: JSON.stringify({ type: i.type, description: i.desc, place: i.place, latitude: i.latitude || BHOPAL.lat, longitude: i.longitude || BHOPAL.lon, people_affected: Number(i.people) || 0, medical_required: !!i.medical }) }).catch(() => ({ possible_duplicates: [] }));
         if (duplicates.possible_duplicates?.length) toast(`Possible duplicate nearby: ${duplicates.possible_duplicates[0].incident_id} · review recommended`);
-        await api('/api/incidents', { method: 'POST', body: JSON.stringify({ type: i.type, description: i.desc, place: i.place, latitude: i.latitude || 22.7196, longitude: i.longitude || 75.8577, people_affected: Number(i.people) || 0, medical_required: !!i.medical }) });
+        await api('/api/incidents', { method: 'POST', body: JSON.stringify({ type: i.type, description: i.desc, place: i.place, latitude: i.latitude || BHOPAL.lat, longitude: i.longitude || BHOPAL.lon, people_affected: Number(i.people) || 0, medical_required: !!i.medical }) });
       } else if (old.status !== i.status && profile.role !== 'CITIZEN') {
         await api(`/api/incidents/${encodeURIComponent(i.id)}/status`, { method: 'PATCH', body: JSON.stringify({ status: i.status, note: 'Status updated from command interface' }) });
       }
@@ -178,7 +198,7 @@
     script.onload = () => {
       const wrap = document.querySelector('.map-wrap');
       const target = document.createElement('div'); target.id = 'liveMap'; target.style.cssText = 'position:absolute;inset:0;z-index:2'; wrap.append(target);
-      leafletMap = L.map(target, { scrollWheelZoom: false }).setView([22.7196, 75.8577], 12);
+      leafletMap = L.map(target, { scrollWheelZoom: false }).setView([BHOPAL.lat, BHOPAL.lon], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(leafletMap);
       leafletMap.on('click', (event) => {
         const form = $('dynamicForm');
@@ -198,7 +218,7 @@
     if (window.nayanMarkerLayer) window.nayanMarkerLayer.remove();
     window.nayanMarkerLayer = L.layerGroup().addTo(leafletMap);
     db.incidents.forEach((incident) => {
-      const lat = Number(incident.latitude) || 22.7196, lon = Number(incident.longitude) || 75.8577;
+      const lat = Number(incident.latitude) || BHOPAL.lat, lon = Number(incident.longitude) || BHOPAL.lon;
       const color = incident.severity === 'Critical' ? '#d94d4d' : incident.severity === 'High' ? '#d8912e' : '#318b66';
       const marker = L.circleMarker([lat, lon], { radius: incident.severity === 'Critical' ? 9 : 7, color: '#fff', weight: 2, fillColor: color, fillOpacity: .95 }).addTo(window.nayanMarkerLayer);
       const popup = document.createElement('div'), title = document.createElement('b');
@@ -243,7 +263,7 @@
         }
         if (form && !form.querySelector('[name="latitude"]')) {
           const field = document.createElement('div'); field.className = 'field full';
-          field.innerHTML = '<label>Map coordinates (click the map or enter coordinates)</label><div style="display:flex;gap:8px"><input name="latitude" type="number" step="any" min="-90" max="90" value="22.7196" placeholder="Latitude"><input name="longitude" type="number" step="any" min="-180" max="180" value="75.8577" placeholder="Longitude"></div>';
+          field.innerHTML = `<label>Map coordinates (Bhopal default; adjust for the exact location)</label><div style="display:flex;gap:8px"><input name="latitude" type="number" step="any" min="-90" max="90" value="${BHOPAL.lat}" placeholder="Latitude"><input name="longitude" type="number" step="any" min="-180" max="180" value="${BHOPAL.lon}" placeholder="Longitude"></div>`;
           form.append(field);
         }
         const description = form?.querySelector('[name="desc"]'), kind = form?.querySelector('[name="type"]');
@@ -274,7 +294,10 @@
           saveButton.onclick = (submitEvent) => {
             const latitude = Number(form.querySelector('[name="latitude"]')?.value), longitude = Number(form.querySelector('[name="longitude"]')?.value);
             original?.call(saveButton, submitEvent);
-            if (db.incidents[0] && Number.isFinite(latitude) && Number.isFinite(longitude)) { db.incidents[0].latitude = latitude; db.incidents[0].longitude = longitude; }
+            if (db.incidents[0] && Number.isFinite(latitude) && Number.isFinite(longitude)) {
+              db.incidents[0].latitude = latitude; db.incidents[0].longitude = longitude;
+              if (leafletMap) { drawMarkers(); leafletMap.panTo([latitude, longitude]); }
+            }
           };
           saveButton.dataset.coordinateHook = 'true';
         }
@@ -330,6 +353,12 @@
       await api('/api/health');
       const config = await api('/api/config');
       if (!config.demo_mode) document.querySelector('.demo-accounts')?.classList.add('hidden');
+      const clock = $('clock');
+      if (clock) clock.innerHTML = '● &nbsp;BHOPAL, MP';
+      const overviewEyebrow = document.querySelector('#view-overview .eyebrow');
+      if (overviewEyebrow) overviewEyebrow.textContent = `${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · Bhopal district`;
+      const mapSubheading = document.querySelector('#view-overview .panel-title small');
+      if (mapSubheading) mapSubheading.textContent = 'Live operational picture · Bhopal, Madhya Pradesh';
       if (token) {
         profile = JSON.parse(localStorage.getItem('nayan-user') || 'null') || await api('/api/auth/me');
         await enterApp();
