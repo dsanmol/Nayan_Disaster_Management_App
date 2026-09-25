@@ -36,7 +36,9 @@
     const response = await fetch(`${apiRoot}${path}`, { ...options, headers });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(body.detail || `Request failed (${response.status})`);
+      const error = new Error(body.detail || `Request failed (${response.status})`);
+      error.status = response.status;
+      throw error;
     }
     return response.status === 204 ? null : response.json();
   };
@@ -333,7 +335,15 @@
         await enterApp();
       }
     } catch (error) {
-      showAuthError(`API unavailable. Start Nayan using the instructions in README.md. (${error.message})`);
+      if (error.status === 401 && token) {
+        token = null;
+        profile = null;
+        localStorage.removeItem('nayan-token');
+        localStorage.removeItem('nayan-user');
+        showAuthError('Your session expired. Please sign in again.');
+      } else {
+        showAuthError(`API unavailable. Start Nayan using the instructions in README.md. (${error.message})`);
+      }
     }
   }
   boot();
