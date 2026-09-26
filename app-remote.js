@@ -99,9 +99,14 @@
     }
     if (!window.nayanCitizenActionGuard) {
       const originalCycleIncident = window.cycleIncident;
+      const originalAdvanceMission = window.advanceMission;
       window.cycleIncident = (id) => {
         if (profile?.role === 'CITIZEN') return toast('Citizens can report incidents and track response status.');
         return originalCycleIncident?.(id);
+      };
+      window.advanceMission = (id) => {
+        if (profile?.role === 'CITIZEN') return toast('Mission progress is updated by the response team.');
+        return originalAdvanceMission?.(id);
       };
       window.nayanCitizenActionGuard = true;
     }
@@ -171,9 +176,14 @@
         if (!old) {
           const resource = db.resources.find((r) => r.name === m.unit), incidentId = m.incident_id || m.incident.split(' · ')[0];
           if (resource?.id) await api('/api/missions', { method: 'POST', body: JSON.stringify({ incident_id: incidentId, resource_id: resource.id }) });
-        } else if (old.status !== m.status) {
-          const target = m.status === 'Completed' ? 'Completed' : m.status;
-          await api(`/api/missions/${encodeURIComponent(m.id)}/status`, { method: 'PATCH', body: JSON.stringify({ status: target }) });
+        }
+      }
+    }
+    if (profile.role !== 'CITIZEN') {
+      for (const mission of db.missions) {
+        const old = before.missions.find((x) => x.id === mission.id);
+        if (old && old.status !== mission.status) {
+          await api(`/api/missions/${encodeURIComponent(mission.id)}/status`, { method: 'PATCH', body: JSON.stringify({ status: mission.status }) });
         }
       }
     }
