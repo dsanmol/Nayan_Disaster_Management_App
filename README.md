@@ -27,7 +27,7 @@ New public registrations receive the Citizen role. Administrators can create sta
 
 ## Included workflows
 
-- Citizen registration/login, incident intake, map-picked coordinates, optional photo uploads, incident status view, public alerts, and shelters.
+- Citizen registration/login, incident intake with permission-based device coordinates (or manually entered coordinates), optional photo uploads, incident status view, public alerts, and shelters.
 - Responder sign-in, mission tracking, field status progression, and route previews.
 - Admin command dashboard, incident priority queue, resource/shelter/alert management, assignments, analytics, and recurring 10-second incident simulation.
 - Local TF-IDF + Logistic Regression incident classification, TF-IDF cosine similarity for nearby duplicate suggestions, transparent severity scoring, resource recommendations, WebSocket updates, CSV export, and an OpenStreetMap view.

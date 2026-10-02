@@ -219,8 +219,8 @@ class IncidentIn(BaseModel):
     type: str = Field(min_length=2, max_length=100)
     description: str = Field(min_length=5, max_length=4000)
     place: str = Field(min_length=2, max_length=240)
-    latitude: float = Field(ge=-90, le=90, default=BHOPAL_LAT)
-    longitude: float = Field(ge=-180, le=180, default=BHOPAL_LON)
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
     people_affected: int = Field(ge=0, le=100000, default=0)
     medical_required: bool = False
 

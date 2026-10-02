@@ -213,15 +213,48 @@
       leafletMap.on('click', (event) => {
         const form = $('dynamicForm');
         if (form?.querySelector('[name="latitude"]')) {
-          form.querySelector('[name="latitude"]').value = event.latlng.lat.toFixed(6);
-          form.querySelector('[name="longitude"]').value = event.latlng.lng.toFixed(6);
-          toast('Report location selected on the map');
+          setIncidentCoordinates(form, event.latlng.lat, event.latlng.lng, 'Map location selected');
+          toast('Incident coordinates selected from the map');
         }
       });
       document.querySelectorAll('.map-bg,.river,.road,.district,#markers,.map-caption').forEach((el) => el.classList.add('hidden'));
       drawMarkers(); setTimeout(() => leafletMap.invalidateSize(), 100);
     };
     document.head.append(script);
+  }
+  function setIncidentCoordinates(form, latitude, longitude, message) {
+    const latField = form.querySelector('[name="latitude"]');
+    const lonField = form.querySelector('[name="longitude"]');
+    if (!latField || !lonField) return;
+    latField.value = Number(latitude).toFixed(6);
+    lonField.value = Number(longitude).toFixed(6);
+    const status = form.querySelector('[data-location-status]');
+    if (status) status.textContent = message;
+  }
+  function locateIncident(form, button) {
+    const status = form.querySelector('[data-location-status]');
+    if (!navigator.geolocation) {
+      if (status) status.textContent = 'Location is unavailable in this browser. Enter coordinates manually.';
+      return;
+    }
+    button.disabled = true;
+    button.textContent = 'Getting location…';
+    if (status) status.textContent = 'Waiting for device location permission…';
+    navigator.geolocation.getCurrentPosition((position) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      setIncidentCoordinates(form, latitude, longitude, `Device location captured · approximately ${Math.round(accuracy)} m accuracy. Check that the pin matches the incident.`);
+      button.disabled = false;
+      button.textContent = 'Use my current location';
+    }, (error) => {
+      const messages = {
+        1: 'Location permission was denied. Allow location in your browser settings, or enter coordinates manually.',
+        2: 'Your device could not determine a location. Try again outdoors or enter coordinates manually.',
+        3: 'Location request timed out. Try again or enter coordinates manually.'
+      };
+      if (status) status.textContent = messages[error.code] || 'Could not get your location. Enter coordinates manually.';
+      button.disabled = false;
+      button.textContent = 'Try location again';
+    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
   }
   function drawMarkers() {
     if (!leafletMap) return;
@@ -273,7 +306,14 @@
         }
         if (form && !form.querySelector('[name="latitude"]')) {
           const field = document.createElement('div'); field.className = 'field full';
-          field.innerHTML = `<label>Map coordinates (Bhopal default; adjust for the exact location)</label><div style="display:flex;gap:8px"><input name="latitude" type="number" step="any" min="-90" max="90" value="${BHOPAL.lat}" placeholder="Latitude"><input name="longitude" type="number" step="any" min="-180" max="180" value="${BHOPAL.lon}" placeholder="Longitude"></div>`;
+          field.innerHTML = '<label>Exact incident coordinates (required)</label><div style="display:flex;gap:8px"><input name="latitude" type="number" step="any" min="-90" max="90" required placeholder="Latitude"><input name="longitude" type="number" step="any" min="-180" max="180" required placeholder="Longitude"></div><small data-location-status role="status" aria-live="polite" style="display:block;color:#71808d;margin-top:6px">Use your device location or enter the incident coordinates manually.</small>';
+          const locationButton = document.createElement('button');
+          locationButton.type = 'button';
+          locationButton.className = 'btn';
+          locationButton.style.marginTop = '8px';
+          locationButton.textContent = 'Use my current location';
+          locationButton.addEventListener('click', () => locateIncident(form, locationButton));
+          field.append(locationButton);
           form.append(field);
         }
         const description = form?.querySelector('[name="desc"]'), kind = form?.querySelector('[name="type"]');
@@ -302,10 +342,14 @@
         if (saveButton && !saveButton.dataset.coordinateHook) {
           const original = saveButton.onclick;
           saveButton.onclick = (submitEvent) => {
-            const latitude = Number(form.querySelector('[name="latitude"]')?.value), longitude = Number(form.querySelector('[name="longitude"]')?.value);
+            const previousFirstIncidentId = db.incidents[0]?.id;
+            const latitude = Number.parseFloat(form.querySelector('[name="latitude"]')?.value);
+            const longitude = Number.parseFloat(form.querySelector('[name="longitude"]')?.value);
             original?.call(saveButton, submitEvent);
-            if (db.incidents[0] && Number.isFinite(latitude) && Number.isFinite(longitude)) {
-              db.incidents[0].latitude = latitude; db.incidents[0].longitude = longitude;
+            const submittedIncident = db.incidents[0]?.id !== previousFirstIncidentId ? db.incidents[0] : null;
+            if (submittedIncident && Number.isFinite(latitude) && Number.isFinite(longitude)) {
+              submittedIncident.latitude = latitude; submittedIncident.longitude = longitude;
+              localStorage.setItem('nayan-state', JSON.stringify(db));
               if (leafletMap) { drawMarkers(); leafletMap.panTo([latitude, longitude]); }
             }
           };
