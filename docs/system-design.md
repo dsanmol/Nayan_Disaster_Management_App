@@ -71,9 +71,9 @@ Available resources are filtered and ranked with a capability/type match and str
 
 When `NAYAN_ROUTING_URL` points to a private OSRM-compatible service, the route endpoint requests driving geometry and estimated travel time from that service. No external routing host is called by default. When unset or unreachable, the endpoint returns an explicitly labeled straight-line estimate. Map display uses OpenStreetMap tiles and requires an Internet connection.
 
-## Live and simulation behavior
+## Live behavior
 
-A WebSocket endpoint emits incident and mission changes to connected authenticated clients. Responders and administrators choose the unit when assigning an unassigned report; model rankings are optional suggestions. Mission transitions update the linked incident to Assigned, En route, Arrived, and Resolved on completion. Incidents linked to a mission cannot be manually cycled from the incident list. The admin dashboard can generate a sample report every ten seconds until simulation is stopped. Seed data is illustrative and centered on Bhopal; do not treat it as real incidents.
+A WebSocket endpoint emits incident and mission changes to connected authenticated clients. Responders and administrators choose the unit when assigning an unassigned report; model rankings are optional suggestions. Mission transitions update the linked incident to Assigned, En route, Arrived, and Resolved on completion. Incidents linked to a mission cannot be manually cycled from the incident list. Seed data is illustrative and centered on Bhopal; do not treat it as real incidents.
 
 ## Deployment
 

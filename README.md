@@ -30,7 +30,7 @@ New public registrations receive the Citizen role. Administrators can create sta
 - Citizen registration/login, incident intake with permission-based device coordinates (or manually entered coordinates), optional photo uploads, incident status view, public alerts, and shelters.
 - Role-selected sign-in for citizens, responders, and administrators; the server checks the selected role against the authenticated account.
 - Responders choose and assign available units to unassigned reports, progress missions through field stages, and view route previews. Each mission stage updates the linked incident status automatically.
-- Admin command dashboard, incident priority queue, resource/shelter/alert management, assignments, analytics, and recurring 10-second incident simulation.
+- Admin command dashboard, incident priority queue, resource/shelter/alert management, assignments, and analytics.
 - Staff Incident Intelligence panel: local TF-IDF + Logistic Regression category suggestions, TF-IDF similarity for nearby duplicate candidates, and unit rankings based on availability, capability, and straight-line distance.
 - Transparent rule-based severity scoring, WebSocket updates, CSV export, and an OpenStreetMap view.
 - SQLite for local setup. PostgreSQL deployments automatically enable PostGIS and maintain indexed point geometry for incidents, resources, and shelters.

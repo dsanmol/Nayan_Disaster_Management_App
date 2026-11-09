@@ -175,7 +175,7 @@
       item.classList.toggle('hidden', profile.role === 'RESPONDER' && ['resources'].includes(v));
     });
     if (profile.role !== 'ADMIN') {
-      document.querySelectorAll('[data-modal="resource"],[data-modal="shelter"],[data-modal="alert"],#simulateBtn,#exportBtn').forEach((el) => el.classList.add('hidden'));
+      document.querySelectorAll('[data-modal="resource"],[data-modal="shelter"],[data-modal="alert"],#exportBtn').forEach((el) => el.classList.add('hidden'));
     }
     if (profile.role === 'CITIZEN') {
       $('assignBtn')?.classList.add('hidden');
@@ -240,7 +240,7 @@
   async function enterApp() {
     window.nayanRemote = { persist, role: profile.role };
     configureRole(); await hydrate(); $('authScreen').classList.add('hidden');
-    installMap(); addRouteActions(); addPhotoControl(); startSimulationLoop(); setupMissionAssignment();
+    installMap(); addRouteActions(); addPhotoControl(); setupMissionAssignment();
     startSocket();
   }
   async function persistChanges() {
@@ -467,17 +467,6 @@
         }, 10);
       }
     });
-  }
-  function startSimulationLoop() {
-    const button = $('simulateBtn'); if (!button || button.dataset.loopReady) return;
-    const createEvent = button.onclick; let timer = null;
-    button.onclick = (event) => {
-      if (timer) { clearInterval(timer); timer = null; button.textContent = '▶  Run simulation'; toast('Disaster simulation stopped'); return; }
-      createEvent?.call(button, event);
-      button.textContent = '■  Stop simulation';
-      timer = setInterval(() => createEvent?.call(button, new Event('click')), 10000);
-    };
-    button.dataset.loopReady = 'true';
   }
   function setupMissionAssignment() {
     const button = $('assignBtn');
