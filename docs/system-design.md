@@ -15,7 +15,7 @@ During disasters, emergency information is often fragmented across citizens, res
 | Issue public alerts and assign teams | No | No | Yes |
 | Review operational analytics | No | Limited | Yes |
 
-Public signup creates citizen accounts. Admin-created staff accounts use the protected admin user API. The responder demo account currently represents the responder role; production deployments still need explicit responder-to-resource identity assignments.
+Public signup creates citizen accounts. Sign-in includes a role choice, which the API checks against the role stored on the authenticated account; the choice does not grant that role. Admin-created staff accounts use the protected admin user API. The responder demo account currently represents the responder role; production deployments still need explicit responder-to-resource identity assignments.
 
 ## Architecture
 
@@ -25,7 +25,7 @@ Browser (HTML / CSS / JavaScript)
 FastAPI service
   |-- auth and role checks
   |-- incident, resource, mission, shelter and alert APIs
-  |-- local text classification and similarity, severity, priority, recommendations
+  |-- local text classification and similarity, severity, priority, recommendations, staff intelligence overview
   |-- simulator, analytics, image upload, route adapter
 PostgreSQL + PostGIS (deploy) / SQLite (local)
   |-- incidents, users, resources, missions, shelters, alerts, history
@@ -58,6 +58,10 @@ Incidents are ordered by descending score and then newest report. Production pri
 
 Open reports within one kilometer are compared using TF-IDF cosine similarity over the incident type and description. Classification uses a local TF-IDF + Logistic Regression pipeline trained on the small curated prototype corpus in `backend/app/ml.py`. Both outputs are advisory: the corpus is not validated for live response, confidence is not calibrated, and an operator must review classifications and possible duplicates.
 
+### Staff incident intelligence
+
+The responder/admin overview combines the category prediction, nearby duplicate candidates, and response-unit rankings for active incidents. It shows the classification confidence as a prototype model signal, the candidate IDs and distances, and the ranking rationale. Severity remains a transparent rule-based score, and unit ranking remains deterministic; neither is a learned AI model. The overview is decision support and does not dispatch a unit or change incident status.
+
 ### Resource recommendation
 
 Available resources are filtered and ranked with a capability/type match and straight-line distance. The admin dashboard dispatches the highest-ranked candidate. Operational deployments should use skills, capacity, real travel time, access constraints, and human approval.
@@ -68,7 +72,7 @@ When `NAYAN_ROUTING_URL` points to a private OSRM-compatible service, the route 
 
 ## Live and simulation behavior
 
-A WebSocket endpoint emits incident and mission changes to connected authenticated clients. The admin dashboard can generate a sample report every ten seconds until simulation is stopped. Seed data is illustrative and centered on Indore; do not treat it as real incidents.
+A WebSocket endpoint emits incident and mission changes to connected authenticated clients. The admin dashboard can generate a sample report every ten seconds until simulation is stopped. Seed data is illustrative and centered on Bhopal; do not treat it as real incidents.
 
 ## Deployment
 

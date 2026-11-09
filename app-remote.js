@@ -11,6 +11,81 @@
   let routeLayer = null;
   const $ = (id) => document.getElementById(id);
   const copy = (x) => JSON.parse(JSON.stringify(x));
+  function mountAuthExperience() {
+    const screen = $('authScreen'), card = screen?.querySelector('.auth-card'), form = $('authForm');
+    if (!screen || !card || !form || $('loginRole')) return;
+    screen.classList.add('auth-screen-modern');
+    const shell = document.createElement('div'); shell.className = 'auth-shell';
+    const story = document.createElement('section'); story.className = 'auth-story';
+    story.innerHTML = '<div class="auth-story-kicker">NAYAN · RESPONSE INTELLIGENCE</div><h2>Turn incident reports into a coordinated response.</h2><p>Local machine-learning support helps teams review incoming reports, spot nearby similarities, and consider available response units.</p><div class="auth-ai-list"><article><span>01</span><div><b>Incident text model</b><small>Suggests a category from the report description.</small></div></article><article><span>02</span><div><b>Nearby report matching</b><small>Highlights similar open reports close to the incident.</small></div></article><article><span>03</span><div><b>Dispatch support</b><small>Ranks available units by capability and distance.</small></div></article></div><div class="auth-story-foot"><b>People stay in control</b><small>Suggestions need staff review. The prototype does not dispatch teams automatically.</small></div>';
+    screen.append(shell); shell.append(story, card); card.classList.add('auth-card-modern');
+    const roleField = document.createElement('div'); roleField.className = 'auth-role-field';
+    const roleLabel = document.createElement('label'); roleLabel.htmlFor = 'loginRole'; roleLabel.textContent = 'Sign in as';
+    const roleSelect = document.createElement('select'); roleSelect.id = 'loginRole'; roleSelect.autocomplete = 'off';
+    [['CITIZEN', 'Citizen'], ['RESPONDER', 'Responder'], ['ADMIN', 'Administrator']].forEach(([value, label]) => {
+      const option = document.createElement('option'); option.value = value; option.textContent = label; roleSelect.append(option);
+    });
+    roleField.append(roleLabel, roleSelect);
+    form.insertBefore(roleField, $('authEmail'));
+    const style = document.createElement('style');
+    style.textContent = `
+      .auth-screen-modern{background:radial-gradient(ellipse at 17% 16%,#1d514c 0,transparent 38%),linear-gradient(135deg,#0c1725,#14263a);padding:28px}
+      .auth-shell{width:min(1080px,100%);display:grid;grid-template-columns:minmax(0,1.1fr) minmax(360px,440px);border-radius:22px;overflow:hidden;background:#fff;box-shadow:0 30px 90px #0005}
+      .auth-story{padding:52px 48px;color:#eef6f6;background:linear-gradient(150deg,#122334,#113d3c);display:flex;flex-direction:column;justify-content:center;min-height:570px}
+      .auth-story-kicker{color:#83d5c9;font-size:10px;font-weight:800;letter-spacing:1.8px}
+      .auth-story h2{max-width:470px;margin:17px 0 12px;font:800 clamp(27px,3.6vw,40px)/1.12 Manrope;letter-spacing:-1.2px}
+      .auth-story>p{max-width:440px;margin:0;color:#b9c9d1;font-size:13px;line-height:1.7}
+      .auth-ai-list{display:grid;gap:13px;margin:30px 0 25px}
+      .auth-ai-list article{display:flex;gap:13px;align-items:flex-start;padding:13px;border:1px solid #ffffff18;border-radius:11px;background:#ffffff08}
+      .auth-ai-list article>span{color:#81d7ca;font:700 11px Manrope;padding-top:2px}
+      .auth-ai-list b,.auth-ai-list small,.auth-story-foot b,.auth-story-foot small{display:block}
+      .auth-ai-list b{font-size:12px}.auth-ai-list small{margin-top:4px;color:#aebfc8;font-size:11px;line-height:1.45}
+      .auth-story-foot{border-top:1px solid #ffffff20;padding-top:17px}.auth-story-foot b{font-size:11px;color:#dff5ef}.auth-story-foot small{margin-top:5px;color:#9fb2bd;font-size:10px;line-height:1.5}
+      .auth-card-modern{width:auto;border-radius:0;box-shadow:none;padding:40px 36px;display:flex;flex-direction:column;justify-content:center}
+      .auth-card-modern h1{font-size:25px}.auth-card-modern .auth-form{gap:11px}
+      .auth-role-field label{display:block;margin-bottom:6px;color:#596675;font-size:11px;font-weight:600}
+      .auth-role-field select{width:100%;background:#fff;color:#243140}
+      .auth-card-modern .auth-form input,.auth-card-modern .auth-form select{min-height:45px}
+      .auth-card-modern .auth-form input:focus,.auth-card-modern .auth-form select:focus{outline:3px solid #0e948822;border-color:#0e9488}
+      @media(max-width:760px){.auth-screen-modern{padding:16px}.auth-shell{width:min(470px,100%);grid-template-columns:1fr}.auth-story{min-height:0;padding:25px 25px 19px}.auth-story h2{font-size:25px;margin:11px 0 7px}.auth-story>p{font-size:11px}.auth-ai-list{grid-template-columns:1fr 1fr;gap:7px;margin:15px 0}.auth-ai-list article{padding:9px;gap:8px}.auth-ai-list article:last-child{display:none}.auth-ai-list small{font-size:10px}.auth-story-foot{padding-top:10px}.auth-card-modern{padding:25px}}
+      .intelligence-panel{margin:16px 0}.intelligence-title{display:flex;align-items:center;gap:9px}.intelligence-badge{background:#e7f6f3;color:#08786f;border-radius:20px;padding:5px 8px;font-size:9px;font-weight:800;letter-spacing:.7px}.intelligence-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:13px}.intelligence-stat{padding:12px 14px;background:#f6f8fa;border:1px solid #edf0f2;border-radius:9px}.intelligence-stat b{display:block;font:800 19px Manrope}.intelligence-stat span{font-size:10px;color:#71808d}.intelligence-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.intelligence-item{border:1px solid #e8edf0;border-radius:10px;padding:13px}.intelligence-item-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:9px}.intelligence-item-head b{font-size:12px}.intelligence-row{font-size:10px;color:#5f6c79;line-height:1.5;margin-top:6px}.intelligence-row strong{color:#344353}.intelligence-method{color:#87929d;font-size:9px;margin-top:9px}.intelligence-empty{padding:16px;color:#7b8794;font-size:11px}.intelligence-footer{padding:12px 18px;border-top:1px solid #edf0f2;color:#7b8794;font-size:10px;line-height:1.5}
+      @media(max-width:850px){.intelligence-list{grid-template-columns:1fr}.intelligence-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
+      @media(max-width:520px){.intelligence-summary{grid-template-columns:1fr 1fr}.intelligence-summary .intelligence-stat:last-child{display:none}}
+    `;
+    document.head.append(style);
+    const context = document.createElement('div'); context.className = 'auth-story-kicker'; context.textContent = 'SECURE WORKSPACE SIGN-IN';
+    card.insertBefore(context, $('authTitle'));
+  }
+  function mountIntelligencePanel() {
+    const metrics = $('metrics');
+    if (!metrics || $('intelligencePanel')) return;
+    const panel = document.createElement('section'); panel.id = 'intelligencePanel'; panel.className = 'panel intelligence-panel hidden';
+    panel.innerHTML = '<div class="panel-title"><div><div class="intelligence-title"><h2>Incident intelligence</h2><span class="intelligence-badge">ML ASSISTED</span></div><small>Highest-severity open reports · text classification, nearby match detection, and response-unit ranking.</small></div></div><div class="panel-body" id="intelligenceBody"><div class="intelligence-empty">Loading review suggestions…</div></div><div class="intelligence-footer">Review suggestions are based on the eight highest-severity open reports. Prototype decision support only: model confidence is not calibrated, severity is rule-based, and unit ranking uses capability and straight-line distance. Staff make the final decisions.</div>';
+    metrics.after(panel);
+  }
+  mountAuthExperience();
+  mountIntelligencePanel();
+  function renderIntelligence(data) {
+    const body = $('intelligenceBody');
+    if (!body) return;
+    if (!data) { body.innerHTML = '<div class="intelligence-empty">Incident intelligence is available to responders and administrators.</div>'; return; }
+    if (data.unavailable) { body.innerHTML = '<div class="intelligence-empty">Could not load review suggestions. Refresh the page or try again shortly.</div>'; return; }
+    const summary = `<div class="intelligence-summary"><div class="intelligence-stat"><b>${Number(data.active_reports) || 0}</b><span>Active reports</span></div><div class="intelligence-stat"><b>${Number(data.category_reviews) || 0}</b><span>Category suggestions to review</span></div><div class="intelligence-stat"><b>${Number(data.duplicate_flags) || 0}</b><span>Reports with nearby matches</span></div></div>`;
+    const items = (data.items || []).map((item) => {
+      const severityValue = String(item.severity || '').toLowerCase();
+      const severityClass = ['critical', 'high', 'medium', 'low'].includes(severityValue) ? severityValue : '';
+      const matchText = item.possible_duplicates?.length
+        ? item.possible_duplicates.map((candidate) => `${esc(candidate.incident_id)} (${esc(candidate.distance_km)} km)`).join(' · ')
+        : 'No similar open report found within 1 km';
+      const recommendation = item.recommended_units?.[0];
+      const dispatchText = recommendation
+        ? `${esc(recommendation.name)} · ${esc(recommendation.distance_km)} km · ${esc(recommendation.reason)}`
+        : item.status === 'Reported' ? 'No available unit to rank' : 'Unit ranking shown for unassigned reports';
+      const reviewLabel = item.category_review ? 'Review suggestion' : 'Matches reported type';
+      return `<article class="intelligence-item"><div class="intelligence-item-head"><b>${esc(item.incident_id)} · ${esc(item.reported_type)}</b><span class="severity ${severityClass}">${esc(item.severity)}</span></div><div class="intelligence-row"><strong>Text model suggests:</strong> ${esc(item.suggested_type)} · ${Math.round((Number(item.model_confidence) || 0) * 100)}% prototype confidence · ${reviewLabel}</div><div class="intelligence-row"><strong>Nearby text matches:</strong> ${matchText}</div><div class="intelligence-row"><strong>Unit ranking:</strong> ${dispatchText}</div><div class="intelligence-method">Reported at ${esc(item.place)} · current status: ${esc(item.status)}</div></article>`;
+    }).join('');
+    body.innerHTML = summary + (items ? `<div class="intelligence-list">${items}</div>` : '<div class="intelligence-empty">No active reports need review.</div>');
+  }
   function updateAnalyticsView() {
     const data = db._analytics || {}, total = data.total ?? db.incidents.length, active = data.active ?? db.incidents.filter((i) => !['Resolved', 'Cancelled'].includes(i.status)).length;
     const resolved = data.resolved ?? db.incidents.filter((i) => i.status === 'Resolved').length;
@@ -63,6 +138,13 @@
     }
     db.incidents = incidents.map(mapIncident);
     db.resources = resources.map((r) => ({ ...r, skill: r.skills, icon: r.type === 'Ambulance' ? '✚' : r.type === 'Fire team' ? '♨' : '⚑' }));
+    let intelligence = null;
+    if (profile.role !== 'CITIZEN') {
+      try { intelligence = await api('/api/intelligence/overview'); }
+      catch (error) { intelligence = { unavailable: true }; console.warn('Nayan intelligence panel unavailable:', error.message); }
+    }
+    db._intelligence = intelligence;
+    renderIntelligence(intelligence);
     db.shelters = shelters;
     db.alerts = alerts.map((a) => ({ title: `${a.title}${a.area && a.area !== 'District-wide' ? ` · ${a.area}` : ''}`, text: a.message, level: a.severity, time: new Date(a.created_at).toLocaleString() }));
     db.missions = missions.map((m) => {
@@ -77,6 +159,7 @@
   }
   function configureRole() {
     document.body.classList.toggle('citizen-mode', profile.role === 'CITIZEN');
+    $('intelligencePanel')?.classList.toggle('hidden', profile.role === 'CITIZEN');
     if (!document.getElementById('roleViewStyles')) {
       const style = document.createElement('style');
       style.id = 'roleViewStyles';
@@ -121,8 +204,10 @@
     registering = !registering;
     $('authName').classList.toggle('hidden', !registering);
     $('authName').required = registering;
+    $('loginRole').closest('.auth-role-field').classList.toggle('hidden', registering);
+    $('loginRole').disabled = registering;
     $('authTitle').textContent = registering ? 'Create your account' : 'Welcome back';
-    $('authSubtitle').textContent = registering ? 'Citizen accounts can submit and track emergency reports.' : 'Sign in to your Nayan response workspace.';
+    $('authSubtitle').textContent = registering ? 'Citizen accounts can submit and track emergency reports.' : 'Choose your account type, then sign in to your Nayan workspace.';
     $('authSubmit').textContent = registering ? 'Create citizen account' : 'Sign in';
     $('authSwitchLabel').textContent = registering ? 'Already registered?' : 'New to Nayan?';
     $('authSwitch').textContent = registering ? 'Sign in' : 'Create citizen account';
@@ -135,7 +220,7 @@
       const result = await api(registering ? '/api/auth/register' : '/api/auth/login', {
         method: 'POST', body: JSON.stringify(registering
           ? { name: $('authName').value, email: $('authEmail').value, password: $('authPassword').value }
-          : { email: $('authEmail').value, password: $('authPassword').value })
+          : { email: $('authEmail').value, password: $('authPassword').value, role: $('loginRole').value })
       });
       token = result.access_token; profile = result.user;
       localStorage.setItem('nayan-token', token); localStorage.setItem('nayan-user', JSON.stringify(profile));

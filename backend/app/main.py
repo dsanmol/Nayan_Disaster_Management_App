@@ -9,13 +9,13 @@ import secrets
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, create_engine, select, text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, create_engine, func, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from .algorithms import duplicate_candidates, haversine_km, recommend_resources
 from .ml import classify_incident as predict_incident_type
@@ -213,6 +213,7 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: str = Field(pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$", max_length=250)
     password: str
+    role: Literal["CITIZEN", "RESPONDER", "ADMIN"]
 
 
 class IncidentIn(BaseModel):
@@ -407,6 +408,9 @@ def login(payload: LoginIn):
         user = db.scalar(select(User).where(User.email == payload.email.strip().lower()))
         if not user or not verify_password(payload.password, user.password_hash):
             raise HTTPException(401, "Email or password is incorrect")
+        if user.role != payload.role:
+            role_label = {"CITIZEN": "citizen", "RESPONDER": "responder", "ADMIN": "administrator"}[user.role]
+            raise HTTPException(403, f"This account is registered as a {role_label}. Choose that account type and try again.")
         return {"access_token": token_for(user), "token_type": "bearer", "user": {"id": user.id, "name": user.name, "email": user.email, "role": user.role}}
 
 
@@ -694,6 +698,51 @@ def check_duplicates(payload: IncidentIn, user: User = Depends(user_dep)):
 @app.post("/api/intelligence/classify")
 def classify_incident(payload: ClassifyIn, user: User = Depends(user_dep)):
     return predict_incident_type(payload.text)
+
+
+@app.get("/api/intelligence/overview")
+def intelligence_overview(user: User = Depends(allow("ADMIN", "RESPONDER"))):
+    with Session() as db:
+        active_count = db.scalar(
+            select(func.count(Incident.id)).where(Incident.status.notin_({"Resolved", "Cancelled"}))
+        ) or 0
+        active = db.scalars(
+            select(Incident)
+            .where(Incident.status.notin_({"Resolved", "Cancelled"}))
+            .order_by(Incident.severity_score.desc(), Incident.created_at.desc())
+            .limit(100)
+        ).all()
+        resources = db.scalars(select(Resource)).all()
+
+    items = []
+    for incident in active[:8]:
+        prediction = predict_incident_type(incident.description)
+        duplicates = duplicate_candidates(
+            incident,
+            [other for other in active if other.id != incident.id],
+        )
+        recommendations = recommend_resources(incident, resources) if incident.status == "Reported" else []
+        items.append({
+            "incident_id": incident.id,
+            "reported_type": incident.type,
+            "place": incident.place,
+            "severity": incident.severity_level,
+            "score": incident.severity_score,
+            "status": incident.status,
+            "suggested_type": prediction["suggested_type"],
+            "model_confidence": prediction["confidence"],
+            "low_confidence": prediction["low_confidence"],
+            "category_review": prediction["suggested_type"] != incident.type or prediction["low_confidence"],
+            "possible_duplicates": duplicates[:2],
+            "recommended_units": recommendations[:2],
+        })
+    return {
+        "model": "Local TF-IDF + Logistic Regression prototype",
+        "active_reports": active_count,
+        "category_reviews": sum(item["category_review"] for item in items),
+        "duplicate_flags": sum(bool(item["possible_duplicates"]) for item in items),
+        "items": items,
+    }
 
 
 @app.get("/api/incidents/{incident_id}/recommendations")
