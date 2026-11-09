@@ -12,7 +12,8 @@ During disasters, emergency information is often fragmented across citizens, res
 | View district incident list | Active incidents | District incidents | District incidents |
 | View mission and update field progress | No | Yes | Yes |
 | Manage response resources and shelters | No | No | Yes |
-| Issue public alerts and assign teams | No | No | Yes |
+| Assign a response unit to an unassigned report | No | Yes | Yes |
+| Issue public alerts | No | No | Yes |
 | Review operational analytics | No | Limited | Yes |
 
 Public signup creates citizen accounts. Sign-in includes a role choice, which the API checks against the role stored on the authenticated account; the choice does not grant that role. Admin-created staff accounts use the protected admin user API. The responder demo account currently represents the responder role; production deployments still need explicit responder-to-resource identity assignments.
@@ -72,7 +73,7 @@ When `NAYAN_ROUTING_URL` points to a private OSRM-compatible service, the route 
 
 ## Live and simulation behavior
 
-A WebSocket endpoint emits incident and mission changes to connected authenticated clients. The admin dashboard can generate a sample report every ten seconds until simulation is stopped. Seed data is illustrative and centered on Bhopal; do not treat it as real incidents.
+A WebSocket endpoint emits incident and mission changes to connected authenticated clients. Responders and administrators choose the unit when assigning an unassigned report; model rankings are optional suggestions. Mission transitions update the linked incident to Assigned, En route, Arrived, and Resolved on completion. Incidents linked to a mission cannot be manually cycled from the incident list. The admin dashboard can generate a sample report every ten seconds until simulation is stopped. Seed data is illustrative and centered on Bhopal; do not treat it as real incidents.
 
 ## Deployment
 

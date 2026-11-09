@@ -481,6 +481,9 @@ async def update_incident(incident_id: str, payload: StatusIn, user: User = Depe
         item = db.get(Incident, incident_id)
         if not item:
             raise HTTPException(404, "Incident not found")
+        linked_mission = db.scalar(select(Mission.id).where(Mission.incident_id == item.id).limit(1))
+        if linked_mission:
+            raise HTTPException(409, "This incident is linked to a mission. Its status follows progress in Mission Control.")
         item.status, item.updated_at = payload.status, datetime.now(timezone.utc)
         db.add(IncidentUpdate(incident_id=item.id, actor_id=user.id, status=payload.status, note=payload.note))
         result = as_incident(item)
@@ -580,13 +583,13 @@ def list_missions(user: User = Depends(allow("ADMIN", "RESPONDER", "CITIZEN"))):
 
 
 @app.post("/api/missions", status_code=201)
-async def assign_mission(payload: AssignmentIn, user: User = Depends(allow("ADMIN"))):
+async def assign_mission(payload: AssignmentIn, user: User = Depends(allow("ADMIN", "RESPONDER"))):
     with Session.begin() as db:
         incident, resource = db.get(Incident, payload.incident_id), db.get(Resource, payload.resource_id)
         if not incident or not resource:
             raise HTTPException(404, "Incident or resource not found")
-        if incident.status in {"Resolved", "Cancelled"} or resource.status != "Available":
-            raise HTTPException(409, "Incident is closed or resource is not available")
+        if incident.status != "Reported" or resource.status != "Available":
+            raise HTTPException(409, "Only unassigned reports and available units can be assigned")
         n = db.scalar(select(Mission.id).order_by(Mission.id.desc()).limit(1))
         num = int(n.split("-")[-1]) + 1 if n else 1
         mission = Mission(id=f"MSN-{num:03d}", incident_id=incident.id, resource_id=resource.id, assigned_by=user.id, status="Assigned")

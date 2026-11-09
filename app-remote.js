@@ -49,6 +49,7 @@
       .auth-card-modern .auth-form input:focus,.auth-card-modern .auth-form select:focus{outline:3px solid #0e948822;border-color:#0e9488}
       @media(max-width:760px){.auth-screen-modern{padding:16px}.auth-shell{width:min(470px,100%);grid-template-columns:1fr}.auth-story{min-height:0;padding:25px 25px 19px}.auth-story h2{font-size:25px;margin:11px 0 7px}.auth-story>p{font-size:11px}.auth-ai-list{grid-template-columns:1fr 1fr;gap:7px;margin:15px 0}.auth-ai-list article{padding:9px;gap:8px}.auth-ai-list article:last-child{display:none}.auth-ai-list small{font-size:10px}.auth-story-foot{padding-top:10px}.auth-card-modern{padding:25px}}
       .intelligence-panel{margin:16px 0}.intelligence-title{display:flex;align-items:center;gap:9px}.intelligence-badge{background:#e7f6f3;color:#08786f;border-radius:20px;padding:5px 8px;font-size:9px;font-weight:800;letter-spacing:.7px}.intelligence-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:13px}.intelligence-stat{padding:12px 14px;background:#f6f8fa;border:1px solid #edf0f2;border-radius:9px}.intelligence-stat b{display:block;font:800 19px Manrope}.intelligence-stat span{font-size:10px;color:#71808d}.intelligence-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.intelligence-item{border:1px solid #e8edf0;border-radius:10px;padding:13px}.intelligence-item-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:9px}.intelligence-item-head b{font-size:12px}.intelligence-row{font-size:10px;color:#5f6c79;line-height:1.5;margin-top:6px}.intelligence-row strong{color:#344353}.intelligence-method{color:#87929d;font-size:9px;margin-top:9px}.intelligence-empty{padding:16px;color:#7b8794;font-size:11px}.intelligence-footer{padding:12px 18px;border-top:1px solid #edf0f2;color:#7b8794;font-size:10px;line-height:1.5}
+      .dispatch-backdrop{position:fixed;inset:0;z-index:60;background:#13203388;display:none;align-items:center;justify-content:center;padding:20px}.dispatch-backdrop.show{display:flex}.dispatch-card{width:min(560px,100%);max-height:min(90vh,760px);overflow:auto;background:#fff;border-radius:15px;box-shadow:0 20px 80px #14243766}.dispatch-head{padding:18px 21px;border-bottom:1px solid #e8ecf1;display:flex;justify-content:space-between;align-items:center}.dispatch-head h2{margin:0;font:800 17px Manrope;color:#182230}.dispatch-head button{border:0;background:transparent;font-size:22px;color:#768390}.dispatch-form{padding:19px 21px;display:grid;gap:14px}.dispatch-form label{font-size:11px;color:#4d5b68;font-weight:700}.dispatch-form select{margin-top:6px;width:100%;padding:11px;border:1px solid #e1e7eb;border-radius:8px;background:#fff;color:#243343}.dispatch-hint{padding:11px;background:#f4f8f8;border:1px solid #e7efee;border-radius:8px;color:#677680;font-size:11px;line-height:1.5}.dispatch-suggestion{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #e6ecef}.dispatch-suggestion small{display:block;color:#7c8893;font-size:10px;margin-top:3px}.dispatch-error{min-height:15px;color:#c84c44;font-size:11px}.dispatch-actions{display:flex;justify-content:flex-end;gap:8px;padding:0 21px 20px}
       @media(max-width:850px){.intelligence-list{grid-template-columns:1fr}.intelligence-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
       @media(max-width:520px){.intelligence-summary{grid-template-columns:1fr 1fr}.intelligence-summary .intelligence-stat:last-child{display:none}}
     `;
@@ -174,22 +175,30 @@
       item.classList.toggle('hidden', profile.role === 'RESPONDER' && ['resources'].includes(v));
     });
     if (profile.role !== 'ADMIN') {
-      document.querySelectorAll('[data-modal="resource"],[data-modal="shelter"],[data-modal="alert"],#assignBtn,#simulateBtn,#exportBtn').forEach((el) => el.classList.add('hidden'));
+      document.querySelectorAll('[data-modal="resource"],[data-modal="shelter"],[data-modal="alert"],#simulateBtn,#exportBtn').forEach((el) => el.classList.add('hidden'));
     }
     if (profile.role === 'CITIZEN') {
+      $('assignBtn')?.classList.add('hidden');
       document.querySelectorAll('#incidentsTable .table-action').forEach((el) => el.classList.add('hidden'));
       document.querySelectorAll('[data-view="alerts"],[data-view="shelters"]').forEach((el) => el.classList.remove('hidden'));
     }
     if (!window.nayanCitizenActionGuard) {
       const originalCycleIncident = window.cycleIncident;
-      const originalAdvanceMission = window.advanceMission;
       window.cycleIncident = (id) => {
         if (profile?.role === 'CITIZEN') return toast('Citizens can report incidents and track response status.');
+        if (db.missions.some((mission) => mission.incident_id === id)) return toast('This incident status follows mission progress in Mission Control.');
         return originalCycleIncident?.(id);
       };
-      window.advanceMission = (id) => {
+      window.advanceMission = async (id) => {
         if (profile?.role === 'CITIZEN') return toast('Mission progress is updated by the response team.');
-        return originalAdvanceMission?.(id);
+        const mission = db.missions.find((item) => item.id === id);
+        const next = { Assigned: 'En route', 'En route': 'Arrived', Arrived: 'Completed' }[mission?.status];
+        if (!mission || !next) return toast('This mission has no further status step.');
+        try {
+          await api(`/api/missions/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status: next }) });
+          await hydrate();
+          toast(`${id} · ${next}; linked incident status updated`);
+        } catch (error) { toast(`Mission update failed: ${error.message}`); }
       };
       window.nayanCitizenActionGuard = true;
     }
@@ -231,7 +240,7 @@
   async function enterApp() {
     window.nayanRemote = { persist, role: profile.role };
     configureRole(); await hydrate(); $('authScreen').classList.add('hidden');
-    installMap(); addRouteActions(); addPhotoControl(); startSimulationLoop(); useRecommendedDispatch();
+    installMap(); addRouteActions(); addPhotoControl(); startSimulationLoop(); setupMissionAssignment();
     startSocket();
   }
   async function persistChanges() {
@@ -470,22 +479,60 @@
     };
     button.dataset.loopReady = 'true';
   }
-  function useRecommendedDispatch() {
-    const button = $('assignBtn'); if (!button || button.dataset.recommendationReady) return;
-    const original = button.onclick;
-    button.onclick = async (event) => {
-      const incident = sorted().find((i) => i.status === 'Reported');
-      if (!incident) { toast('No unassigned incident found'); return; }
-      try {
-        const result = await api(`/api/incidents/${encodeURIComponent(incident.id)}/recommendations`);
-        const best = result.recommendations[0];
-        if (!best) { toast('No available response unit matches this incident'); return; }
-        db.resources.sort((a, b) => Number(b.id === best.resource_id) - Number(a.id === best.resource_id));
-        toast(`Recommended ${best.name} · ${best.distance_km} km · ${best.reason}`);
-        original?.call(button, event);
-      } catch (error) { toast(`Recommendation unavailable: ${error.message}`); }
+  function setupMissionAssignment() {
+    const button = $('assignBtn');
+    if (!button || button.dataset.manualAssignmentReady || !['ADMIN', 'RESPONDER'].includes(profile?.role)) return;
+    const backdrop = document.createElement('div'); backdrop.id = 'dispatchDialog'; backdrop.className = 'dispatch-backdrop';
+    backdrop.innerHTML = '<section class="dispatch-card" role="dialog" aria-modal="true" aria-labelledby="dispatchTitle"><div class="dispatch-head"><div><h2 id="dispatchTitle">Assign a response unit</h2><small style="display:block;margin-top:4px;color:#768390;font-size:11px">Choose the incident and available unit. Suggestions never assign automatically.</small></div><button type="button" data-close-dispatch aria-label="Close">×</button></div><form class="dispatch-form" id="dispatchForm"><div><label for="dispatchIncident">Incident</label><select id="dispatchIncident" required><option value="">Choose an unassigned incident</option></select></div><div class="dispatch-hint" id="dispatchSuggestions">Choose an incident to see optional ranked unit suggestions.</div><div><label for="dispatchResource">Response unit</label><select id="dispatchResource" required><option value="">Choose a response unit</option></select></div><div class="dispatch-error" id="dispatchError" role="status" aria-live="polite"></div></form><div class="dispatch-actions"><button type="button" class="btn" data-close-dispatch>Cancel</button><button type="submit" form="dispatchForm" class="btn primary" id="confirmDispatch">Assign selected unit</button></div></section>';
+    document.body.append(backdrop);
+    const form = $('dispatchForm'), incidentSelect = $('dispatchIncident'), resourceSelect = $('dispatchResource');
+    const close = () => backdrop.classList.remove('show');
+    const setOptions = (select, placeholder, rows, labelFor) => {
+      select.replaceChildren(new Option(placeholder, ''));
+      rows.forEach((row) => select.add(new Option(labelFor(row), String(row.id))));
     };
-    button.dataset.recommendationReady = 'true';
+    const open = () => {
+      const incidents = db.incidents.filter((item) => item.status === 'Reported' && !db.missions.some((mission) => mission.incident_id === item.id));
+      const resources = db.resources.filter((item) => item.status === 'Available');
+      setOptions(incidentSelect, 'Choose an unassigned incident', incidents, (item) => `${item.id} · ${item.type} · ${item.place}`);
+      setOptions(resourceSelect, 'Choose a response unit', resources, (item) => `${item.name} · ${item.type} · ${item.base}`);
+      $('dispatchError').textContent = '';
+      $('dispatchSuggestions').textContent = incidents.length ? 'Choose an incident to see optional ranked unit suggestions. You must select and confirm a unit.' : 'There are no unassigned incidents available to dispatch.';
+      if (!resources.length) $('dispatchError').textContent = 'There are no available response units right now.';
+      backdrop.classList.add('show');
+    };
+    button.onclick = open;
+    button.dataset.manualAssignmentReady = 'true';
+    backdrop.querySelectorAll('[data-close-dispatch]').forEach((el) => el.addEventListener('click', close));
+    backdrop.addEventListener('click', (event) => { if (event.target === backdrop) close(); });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && backdrop.classList.contains('show')) close(); });
+    incidentSelect.addEventListener('change', async () => {
+      const incidentId = incidentSelect.value, container = $('dispatchSuggestions');
+      resourceSelect.value = '';
+      if (!incidentId) { container.textContent = 'Choose an incident to see optional ranked unit suggestions. You must select and confirm a unit.'; return; }
+      container.textContent = 'Calculating optional capability and distance rankings…';
+      try {
+        const result = await api(`/api/incidents/${encodeURIComponent(incidentId)}/recommendations`);
+        if (incidentSelect.value !== incidentId) return;
+        if (!result.recommendations.length) { container.textContent = 'No available unit can be recommended. You may still choose any available unit from the list.'; return; }
+        container.innerHTML = '<strong>Optional unit suggestions · you make the assignment</strong>' + result.recommendations.map((item) => `<div class="dispatch-suggestion"><span><b>${esc(item.name)}</b><small>${esc(item.distance_km)} km · ${esc(item.reason)}</small></span><button type="button" class="btn" data-select-resource="${Number(item.resource_id)}">Choose</button></div>`).join('');
+        container.querySelectorAll('[data-select-resource]').forEach((choose) => choose.addEventListener('click', () => { resourceSelect.value = choose.dataset.selectResource; $('dispatchError').textContent = 'Suggestion selected. Press “Assign selected unit” to confirm.'; }));
+      } catch (error) { container.textContent = `Suggestions unavailable: ${error.message}. You can still choose any available unit.`; }
+    });
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      const incidentId = incidentSelect.value, resourceId = Number(resourceSelect.value);
+      const resource = db.resources.find((item) => Number(item.id) === resourceId);
+      const submit = $('confirmDispatch'); submit.disabled = true; submit.textContent = 'Assigning…'; $('dispatchError').textContent = '';
+      try {
+        const result = await api('/api/missions', { method: 'POST', body: JSON.stringify({ incident_id: incidentId, resource_id: resourceId }) });
+        close();
+        await hydrate();
+        toast(`${result.id} created · ${resource?.name || 'Response unit'} assigned by ${profile.role.toLowerCase()}`);
+      } catch (error) { $('dispatchError').textContent = `Could not assign this unit: ${error.message}`; }
+      finally { submit.disabled = false; submit.textContent = 'Assign selected unit'; }
+    });
   }
   async function boot() {
     try {
